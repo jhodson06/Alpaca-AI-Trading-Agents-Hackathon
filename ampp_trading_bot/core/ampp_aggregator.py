@@ -331,8 +331,9 @@ class MarketDataAggregator:
             
             if symbols:
                 if len(symbols) > 190:
-                    logger.info("[Layer 1] Found %d 0DTE contracts. Truncating to 190 to respect Free Tier limit.", len(symbols))
-                    symbols = symbols[:190]
+                    logger.info("[Layer 1] Found %d 0DTE contracts. Taking middle 190 (ATM) to respect Free Tier limit.", len(symbols))
+                    mid = len(symbols) // 2
+                    symbols = symbols[max(0, mid - 95):mid + 95]
                 else:
                     logger.info("[Layer 1] Found %d active 0DTE contracts. Subscribing to stream...", len(symbols))
                 self._stream.subscribe_quotes(self._on_quote, *symbols)
