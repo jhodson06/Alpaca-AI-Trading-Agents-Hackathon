@@ -141,8 +141,8 @@ TARGET_UNDERLYINGS: list[str] = ["SPY"]
 GEMINI_MODEL_NAME: str = "gemini-3.7-flash"
 
 # Command used to launch the Alpaca MCP server as a stdio subprocess.
-MCP_SERVER_COMMAND: str = "venv/bin/python"
-MCP_SERVER_ARGS: list[str] = ["-m", "alpaca_mcp_server"]
+MCP_SERVER_COMMAND: str = "venv/bin/alpaca-mcp-server"
+MCP_SERVER_ARGS: list[str] = []
 
 
 # ---------------------------------------------------------------------------
