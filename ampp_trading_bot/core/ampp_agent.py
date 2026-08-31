@@ -336,6 +336,23 @@ class AMPPOrchestrator:
                 history.append(ConversationTurn(role="model", content=decision_text))
                 return decision
 
+            # Check if the model output a tool call as plain text JSON
+            # instead of using the SDK's function-calling mechanism.
+            text_tool_call = _parse_text_tool_call(decision_text)
+            if text_tool_call is not None:
+                tool_name, tool_args = text_tool_call
+                logger.info("[Layer 2] Model requested tool (via text): %s(%s)", tool_name, tool_args)
+                try:
+                    tool_result = await session.call_tool(tool_name, tool_args)
+                    observation = _extract_tool_json(tool_result)
+                except Exception as exc:  # noqa: BLE001
+                    observation = {"error": str(exc)}
+                    logger.warning("[Layer 2] Tool call %s failed: %s", tool_name, exc)
+
+                history.append(ConversationTurn(role="model", content=json.dumps({"tool_call": tool_name, "args": tool_args})))
+                history.append(ConversationTurn(role="tool", content=json.dumps(observation)))
+                continue
+
             # Model produced neither a recognized function call nor a
             # parseable terminal decision. Feed back a corrective
             # observation rather than silently looping forever on
@@ -683,6 +700,38 @@ def _parse_terminal_decision(text: str) -> dict[str, Any] | None:
     if parsed.get("action") not in ("abort", "execute"):
         return None
     return parsed
+
+def _parse_text_tool_call(text: str) -> tuple[str, dict[str, Any]] | None:
+    """Parse a tool call that Gemini output as plain text JSON.
+
+    Sometimes Gemini writes tool calls as text like:
+      {"tool_call": "get_option_quote", "args": {"symbol": "SPY..."}}
+    instead of using the SDK's function_call mechanism. This function
+    detects and parses those so the cognitive loop can execute them.
+    """
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:]
+        cleaned = cleaned.strip()
+
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(parsed, dict):
+        return None
+
+    # Check for {"tool_call": "name", "args": {...}} format
+    tool_name = parsed.get("tool_call") or parsed.get("name") or parsed.get("tool")
+    tool_args = parsed.get("args") or parsed.get("arguments") or parsed.get("parameters") or {}
+
+    if tool_name and isinstance(tool_name, str):
+        return tool_name, tool_args
+
+    return None
 
 
 def _mcp_tools_to_genai_tools(mcp_tools_result: Any) -> list[Any]:
