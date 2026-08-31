@@ -381,7 +381,7 @@ class AMPPOrchestrator:
             for turn in history
         ]
 
-        models_to_try = [config.GEMINI_MODEL_NAME, "gemini-2.0-flash"]
+        models_to_try = [config.GEMINI_MODEL_NAME, "gemini-3.6-flash", "gemini-3.5-flash"]
         last_exc = None
 
         for model_name in models_to_try:
