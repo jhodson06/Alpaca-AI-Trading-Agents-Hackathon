@@ -330,7 +330,11 @@ class MarketDataAggregator:
             symbols = [c.symbol for c in contracts.option_contracts]
             
             if symbols:
-                logger.info("[Layer 1] Found %d active 0DTE contracts. Subscribing to stream...", len(symbols))
+                if len(symbols) > 190:
+                    logger.info("[Layer 1] Found %d 0DTE contracts. Truncating to 190 to respect Free Tier limit.", len(symbols))
+                    symbols = symbols[:190]
+                else:
+                    logger.info("[Layer 1] Found %d active 0DTE contracts. Subscribing to stream...", len(symbols))
                 self._stream.subscribe_quotes(self._on_quote, *symbols)
                 self._stream.subscribe_trades(self._on_trade, *symbols)
             else:
