@@ -367,7 +367,12 @@ class AMPPOrchestrator:
     async def _call_gemini(
         self, history: list[ConversationTurn], gemini_tools: list[Any]
     ) -> Any:
-        """Send the accumulated conversation to Gemini Pro and return the raw response."""
+        """Send the accumulated conversation to Gemini and return the raw response.
+
+        Includes retry logic with exponential backoff for transient 503/429
+        errors, and falls back to gemini-2.0-flash if the primary model is
+        persistently unavailable.
+        """
         contents = [
             genai_types.Content(
                 role="user" if turn.role in ("user", "tool") else "model",
@@ -375,14 +380,42 @@ class AMPPOrchestrator:
             )
             for turn in history
         ]
-        return await self._genai_client.aio.models.generate_content(
-            model=config.GEMINI_MODEL_NAME,
-            contents=contents,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=config.AMPP_SYSTEM_PROMPT,
-                tools=gemini_tools,
-            ),
-        )
+
+        models_to_try = [config.GEMINI_MODEL_NAME, "gemini-2.0-flash"]
+        last_exc = None
+
+        for model_name in models_to_try:
+            for attempt in range(3):
+                try:
+                    response = await self._genai_client.aio.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=genai_types.GenerateContentConfig(
+                            system_instruction=config.AMPP_SYSTEM_PROMPT,
+                            tools=gemini_tools,
+                        ),
+                    )
+                    if model_name != config.GEMINI_MODEL_NAME:
+                        logger.info("[Layer 2] Successfully used fallback model: %s", model_name)
+                    return response
+                except Exception as exc:
+                    last_exc = exc
+                    err_str = str(exc)
+                    if "503" in err_str or "429" in err_str or "UNAVAILABLE" in err_str:
+                        wait = 2 ** attempt
+                        logger.warning(
+                            "[Layer 2] Gemini %s returned transient error (attempt %d/3). "
+                            "Retrying in %ds... Error: %s",
+                            model_name, attempt + 1, wait, err_str[:120],
+                        )
+                        await asyncio.sleep(wait)
+                    else:
+                        raise  # Non-transient error, don't retry
+
+            logger.warning("[Layer 2] Model %s exhausted retries, trying fallback...", model_name)
+
+        # All models and retries exhausted
+        raise last_exc
 
     # ------------------------------------------------------------------
     # Execution
