@@ -115,7 +115,7 @@ MIN_WARM_UP_EPOCHS: int = 10
 
 # Z-score threshold that defines a "severe volume anomaly" worth escalating
 # to Layer 2.
-Z_SCORE_TRIGGER_THRESHOLD: float = 3.0
+Z_SCORE_TRIGGER_THRESHOLD: float = 2.0
 
 # Cooldown, in seconds, enforced after any successful trigger dispatch to
 # Layer 2. Prevents cascading redundant triggers from saturating the LLM
