@@ -36,8 +36,11 @@ import asyncio
 import logging
 import time
 from collections import deque
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
+
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import GetOptionContractsRequest
 
 try:
     from alpaca.data.live import OptionDataStream
@@ -98,8 +101,6 @@ class MarketDataAggregator:
             config.ALPACA_API_KEY,
             config.ALPACA_SECRET_KEY,
         )
-        self._stream.subscribe_quotes(self._on_quote, *config.TARGET_UNDERLYINGS)
-        self._stream.subscribe_trades(self._on_trade, *config.TARGET_UNDERLYINGS)
 
     # ------------------------------------------------------------------
     # WebSocket callbacks — must stay fast and non-blocking
@@ -312,9 +313,32 @@ class MarketDataAggregator:
         epoch_task = asyncio.create_task(self._epoch_loop())
         try:
             logger.info(
-                "[Layer 1] Connecting to Alpaca OptionDataStream for %s...",
+                "[Layer 1] Fetching active 0DTE contract symbols for %s...",
                 config.TARGET_UNDERLYINGS,
             )
+            
+            client = TradingClient(config.ALPACA_API_KEY, config.ALPACA_SECRET_KEY, paper=config.ALPACA_PAPER_TRADE)
+            req = GetOptionContractsRequest(
+                underlying_symbols=config.TARGET_UNDERLYINGS,
+                status="active",
+                expiration_date_gte=date.today(),
+                expiration_date_lte=date.today(),
+                limit=2000
+            )
+            
+            contracts = client.get_option_contracts(req)
+            symbols = [c.symbol for c in contracts.option_contracts]
+            
+            if symbols:
+                logger.info("[Layer 1] Found %d active 0DTE contracts. Subscribing to stream...", len(symbols))
+                self._stream.subscribe_quotes(self._on_quote, *symbols)
+                self._stream.subscribe_trades(self._on_trade, *symbols)
+            else:
+                logger.warning("[Layer 1] No 0DTE contracts found for today. Subscribing to underlyings as fallback.")
+                self._stream.subscribe_quotes(self._on_quote, *config.TARGET_UNDERLYINGS)
+                self._stream.subscribe_trades(self._on_trade, *config.TARGET_UNDERLYINGS)
+
+            logger.info("[Layer 1] Starting WebSocket OptionDataStream...")
             await self._stream._run_forever()
         finally:
             epoch_task.cancel()
