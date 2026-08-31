@@ -138,7 +138,7 @@ SLIPPAGE_WEIGHT: float = 0.60
 # Underlying symbols this system monitors for 0DTE option block trades.
 TARGET_UNDERLYINGS: list[str] = ["SPY"]
 
-GEMINI_MODEL_NAME: str = "gemini-3.7-flash"
+GEMINI_MODEL_NAME: str = "gemini-3.5-flash-lite"
 
 # Command used to launch the Alpaca MCP server as a stdio subprocess.
 MCP_SERVER_COMMAND: str = "/home/ubuntu/.local/bin/uvx"
