@@ -465,7 +465,7 @@ class AMPPOrchestrator:
             return
 
         try:
-            limit_price = float(limit_price)
+            limit_price = round(float(limit_price), 2)
             proposed_qty = int(proposed_qty)
         except (TypeError, ValueError):
             logger.error(
