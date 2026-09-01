@@ -137,7 +137,10 @@ class AlpacaDirectSession:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> _ToolResult:
         """Route a tool call to the appropriate Alpaca SDK method."""
-        logger.info("[MCP Bridge] Executing tool: %s(%s)", name, arguments)
+        if name == "get_option_quote":
+            logger.debug("[MCP Bridge] Executing tool: %s(%s)", name, arguments)
+        else:
+            logger.info("[MCP Bridge] Executing tool: %s(%s)", name, arguments)
 
         if name == "get_account":
             return await self._get_account()
