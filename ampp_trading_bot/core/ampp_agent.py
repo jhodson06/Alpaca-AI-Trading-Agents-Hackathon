@@ -521,6 +521,11 @@ class AMPPOrchestrator:
                 },
             )
             order_data = _extract_tool_json(order_result)
+            
+            if "error" in order_data:
+                logger.error("[Layer 2] Alpaca rejected the order: %s", order_data["error"])
+                return
+
             confirmation_id = order_data.get("id") or order_data.get("order_id")
             logger.info(
                 "[Layer 2] ORDER CONFIRMED. contract=%s qty=%d limit=$%.2f id=%s",
